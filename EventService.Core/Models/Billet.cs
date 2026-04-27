@@ -11,7 +11,7 @@ public class Billet
     public int? VisiteurId { get; set; }
     public int BilletTypeId { get; set; }
 
-    public string PaymentTransactionId { get; set; } = string.Empty;
+    public string PaymentTransactionId { get; set; } 
     
     public BilletType BilletType { get; set; } = null!;
 }

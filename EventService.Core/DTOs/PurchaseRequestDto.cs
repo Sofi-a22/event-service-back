@@ -5,9 +5,9 @@ namespace EventService.Core.DTOs;
 public class PurchaseRequestDto
 {
     [Required]
-    [Range(1, 5)]
-    public int Quantite { get; set; }
+    public int VisiteurId { get; set; }
 
     [Required]
-    public int VisiteurId { get; set; }
+    [MinLength(1, ErrorMessage = "At least one ticket item is required")]
+    public List<PurchaseItemDto> Items { get; set; } = new();
 }

@@ -3,6 +3,7 @@ using System;
 using EventService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Oracle.EntityFrameworkCore.Metadata;
 
@@ -11,9 +12,11 @@ using Oracle.EntityFrameworkCore.Metadata;
 namespace EventService.Infrastructure.Migrations
 {
     [DbContext(typeof(EventDbContext))]
-    partial class EventDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260427122441_FixIsDeletedType")]
+    partial class FixIsDeletedType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -49,6 +52,7 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("DATE_VALIDATION");
 
                     b.Property<string>("PaymentTransactionId")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("NVARCHAR2(100)")
                         .HasColumnName("PAYMENT_TRANSACTION_ID");
@@ -153,7 +157,9 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("END_DATE");
 
                     b.Property<int>("IsDeleted")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("NUMBER(1)")
+                        .HasDefaultValue(0)
                         .HasColumnName("IS_DELETED");
 
                     b.Property<string>("LienPartage")

@@ -1,290 +1,226 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using EventService.Core.Models;
-using EventService.Infrastructure.Data;
 using EventService.Core.DTOs;
+using EventService.Core.Interfaces;
 
-namespace EventService.Controllers
+namespace EventService.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class EventsController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class EventsController : ControllerBase
+    private readonly IUnitOfWork _uow;
+    private readonly IPurchaseService _purchaseService;
+
+    public EventsController(IUnitOfWork uow, IPurchaseService purchaseService)
     {
-        private readonly EventDbContext _context;
+        _uow = uow;
+        _purchaseService = purchaseService;
+    }
 
-        public EventsController(EventDbContext context)
+    // GET: api/events?page=1&pageSize=10
+    [HttpGet]
+    public async Task<ActionResult> GetEvents(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
+        var events = await _uow.Evenements.GetAllAsync(page, pageSize);
+        var total = await _uow.Evenements.GetTotalCountAsync();
+
+        return Ok(new
         {
-            _context = context;
-        }
+            data = events,
+            page,
+            pageSize,
+            total,
+            totalPages = (int)Math.Ceiling((double)total / pageSize)
+        });
+    }
 
-        // ========== CRUD EXISTANT ==========
+    // GET: api/events/5
+    [HttpGet("{id}")]
+    public async Task<ActionResult> GetEvent(int id)
+    {
+        var evenement = await _uow.Evenements.GetByIdAsync(id);
 
-        // GET: api/events
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Evenement>>> GetEvents()
+        if (evenement == null)
+            return NotFound(new { message = $"Event with ID {id} not found" });
+
+        return Ok(evenement);
+    }
+
+    // GET: api/events/organizer/{organisateurId}
+    [HttpGet("organizer/{organisateurId}")]
+    public async Task<ActionResult> GetEventsByOrganizer(int organisateurId)
+    {
+        var events = await _uow.Evenements.GetByOrganisateurAsync(organisateurId);
+        return Ok(events);
+    }
+
+    // POST: api/events
+    [HttpPost]
+    public async Task<ActionResult> CreateEvent(CreateEventDto createDto)
+    {
+        var evenement = new Evenement
         {
-            var events = await _context.Evenements
-                .Include(e => e.Localisation)
-                .Include(e => e.BilletTypes)
-                .ToListAsync();
+            Titre = createDto.Titre,
+            Description = createDto.Description,
+            StartDate = createDto.StartDate,
+            EndDate = createDto.EndDate,
+            TypeEvent = createDto.TypeEvent,
+            Categorie = createDto.Categorie,
+            Disponibilite = createDto.Disponibilite ?? "Draft",
+            Capacite = createDto.Capacite,
+            PlacesRestantes = createDto.Capacite,
+            LienPartage = createDto.LienPartage ?? GenerateLienPartage(),
+            OrganisateurId = createDto.OrganisateurId,
+            LocalisationId = createDto.LocalisationId,
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false
+        };
 
-            return Ok(events);
-        }
+        await _uow.Evenements.AddAsync(evenement);
+        await _uow.SaveChangesAsync();
 
-        // GET: api/events/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Evenement>> GetEvent(int id)
-        {
-            var evenement = await _context.Evenements
-                .Include(e => e.Localisation)
-                .Include(e => e.BilletTypes)
-                .FirstOrDefaultAsync(e => e.Id == id);
+        return CreatedAtAction(nameof(GetEvent), new { id = evenement.Id }, evenement);
+    }
 
-            if (evenement == null)
+    // PUT: api/events/5
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateEvent(int id, UpdateEventDto updateDto)
+    {
+        if (id != updateDto.Id)
+            return BadRequest(new { message = "ID mismatch" });
+
+        var existingEvent = await _uow.Evenements.GetByIdAsync(id);
+
+        if (existingEvent == null)
+            return NotFound(new { message = $"Event with ID {id} not found" });
+
+        // ✅ Owner check
+        if (existingEvent.OrganisateurId != updateDto.OrganisateurId)
+            return StatusCode(403, new { message = "You are not the owner of this event" });
+
+        // ✅ Guard: new capacity cannot be less than tickets already sold
+        var soldCount = existingEvent.Capacite - existingEvent.PlacesRestantes;
+        if (updateDto.Capacite < soldCount)
+            return BadRequest(new
             {
-                return NotFound(new { message = $"Event with ID {id} not found" });
-            }
-
-            return Ok(evenement);
-        }
-
-        // GET: api/events/organizer/{organisateurId}
-        [HttpGet("organizer/{organisateurId}")]
-        public async Task<ActionResult<IEnumerable<Evenement>>> GetEventsByOrganizer(int organisateurId)
-        {
-            var events = await _context.Evenements
-                .Include(e => e.Localisation)
-                .Include(e => e.BilletTypes)
-                .Where(e => e.OrganisateurId == organisateurId)
-                .ToListAsync();
-
-            return Ok(events);
-        }
-
-        // POST: api/events
-        [HttpPost]
-        public async Task<ActionResult<Evenement>> CreateEvent(CreateEventDto createDto)
-        {
-            var evenement = new Evenement
-            {
-                Titre = createDto.Titre,
-                Description = createDto.Description,
-                StartDate = createDto.StartDate,
-                EndDate = createDto.EndDate,
-                TypeEvent = createDto.TypeEvent,
-                Categorie = createDto.Categorie,
-                Disponibilite = createDto.Disponibilite ?? "Draft",
-                Capacite = createDto.Capacite,
-                PlacesRestantes = createDto.Capacite,
-                LienPartage = createDto.LienPartage ?? GenerateLienPartage(),
-                OrganisateurId = createDto.OrganisateurId,
-                LocalisationId = createDto.LocalisationId,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Evenements.Add(evenement);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetEvent), new { id = evenement.Id }, evenement);
-        }
-
-        // PUT: api/events/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateEvent(int id, UpdateEventDto updateDto)
-        {
-            if (id != updateDto.Id)
-            {
-                return BadRequest(new { message = "ID mismatch" });
-            }
-
-            var existingEvent = await _context.Evenements.FindAsync(id);
-            if (existingEvent == null)
-            {
-                return NotFound(new { message = $"Event with ID {id} not found" });
-            }
-
-            existingEvent.Titre = updateDto.Titre;
-            existingEvent.Description = updateDto.Description;
-            existingEvent.StartDate = updateDto.StartDate;
-            existingEvent.EndDate = updateDto.EndDate;
-            existingEvent.TypeEvent = updateDto.TypeEvent;
-            existingEvent.Categorie = updateDto.Categorie;
-            existingEvent.Disponibilite = updateDto.Disponibilite;
-            existingEvent.Capacite = updateDto.Capacite;
-            existingEvent.PlacesRestantes = updateDto.Capacite - (existingEvent.Capacite - existingEvent.PlacesRestantes);
-            existingEvent.OrganisateurId = updateDto.OrganisateurId;
-            existingEvent.LocalisationId = updateDto.LocalisationId;
-            existingEvent.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // DELETE: api/events/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteEvent(int id)
-        {
-            var evenement = await _context.Evenements
-                .Include(e => e.BilletTypes)
-                .ThenInclude(bt => bt.Billets)
-                .FirstOrDefaultAsync(e => e.Id == id);
-
-            if (evenement == null)
-            {
-                return NotFound(new { message = $"Event with ID {id} not found" });
-            }
-
-            _context.Evenements.Remove(evenement);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // POST: api/events/{id}/purchase
-        [HttpPost("{id}/purchase")]
-        public async Task<IActionResult> PurchaseTickets(int id, [FromBody] PurchaseRequestDto request)
-        {
-            var evenement = await _context.Evenements
-                .Include(e => e.BilletTypes)
-                .ThenInclude(bt => bt.Billets)
-                .FirstOrDefaultAsync(e => e.Id == id);
-
-            if (evenement == null)
-                return NotFound(new { message = "Event not found" });
-
-            // Limite de 5 billets maximum
-            if (request.Quantite > 5)
-                return BadRequest(new { message = "Maximum 5 tickets per purchase" });
-
-            // Récupérer les billets disponibles
-            var billetsDisponibles = evenement.BilletTypes
-                .SelectMany(bt => bt.Billets)
-                .Where(b => b.Statut == "Disponible")
-                .Take(request.Quantite)
-                .ToList();
-
-            if (billetsDisponibles.Count < request.Quantite)
-                return BadRequest(new { message = "Not enough tickets available" });
-
-            // Réserver les billets
-            foreach (var billet in billetsDisponibles)
-            {
-                billet.Statut = "Reserve";
-                billet.DateReservation = DateTime.UtcNow;
-                billet.VisiteurId = request.VisiteurId;
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = $"{request.Quantite} ticket(s) reserved",
-                tickets = billetsDisponibles.Select(b => new { b.Id, b.Code, b.Statut })
+                message = $"New capacity ({updateDto.Capacite}) cannot be less than tickets already sold ({soldCount})"
             });
-        }
 
-        // ========== NOUVEAUX ENDPOINTS DE RECHERCHE ==========
+        existingEvent.Titre = updateDto.Titre;
+        existingEvent.Description = updateDto.Description;
+        existingEvent.StartDate = updateDto.StartDate;
+        existingEvent.EndDate = updateDto.EndDate;
+        existingEvent.TypeEvent = updateDto.TypeEvent;
+        existingEvent.Categorie = updateDto.Categorie;
+        existingEvent.Disponibilite = updateDto.Disponibilite;
+        existingEvent.Capacite = updateDto.Capacite;
+        existingEvent.PlacesRestantes = updateDto.Capacite - soldCount;
+        existingEvent.LocalisationId = updateDto.LocalisationId;
+        existingEvent.UpdatedAt = DateTime.UtcNow;
 
-        // GET: api/events/search?q=music&categorie=Music&typeEvent=ONSITE
-        [HttpGet("search")]
-        public async Task<ActionResult<IEnumerable<Evenement>>> SearchEvents(
-            [FromQuery] string? q,
-            [FromQuery] string? categorie,
-            [FromQuery] string? typeEvent,
-            [FromQuery] DateTime? startDate,
-            [FromQuery] DateTime? endDate)
+        _uow.Evenements.Update(existingEvent);
+        await _uow.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    // DELETE: api/events/5 (soft delete)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteEvent(int id, [FromQuery] int organisateurId)
+    {
+        var evenement = await _uow.Evenements.GetByIdAsync(id);
+
+        if (evenement == null)
+            return NotFound(new { message = $"Event with ID {id} not found" });
+
+        // ✅ Owner check
+        if (evenement.OrganisateurId != organisateurId)
+            return StatusCode(403, new { message = "You are not the owner of this event" });
+
+        // ✅ Guard: cannot delete if sold/reserved tickets exist
+        var hasSoldTickets = evenement.BilletTypes
+            .SelectMany(bt => bt.Billets)
+            .Any(b => b.Statut == "Confirme" || b.Statut == "Reserve");
+
+        if (hasSoldTickets)
+            return BadRequest(new { message = "Cannot delete event with sold or reserved tickets" });
+
+        _uow.Evenements.SoftDelete(evenement);
+        await _uow.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    // POST: api/events/{id}/purchase
+    [HttpPost("{id}/purchase")]
+    public async Task<IActionResult> PurchaseTickets(int id, [FromBody] PurchaseRequestDto request)
+    {
+        var (success, error, response) = await _purchaseService.PurchaseTicketsAsync(id, request);
+
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(response);
+    }
+
+    // GET: api/events/search
+    [HttpGet("search")]
+    public async Task<ActionResult> SearchEvents(
+        [FromQuery] string? q,
+        [FromQuery] string? categorie,
+        [FromQuery] string? typeEvent,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var events = await _uow.Evenements.SearchAsync(q, categorie, typeEvent, startDate, endDate, page, pageSize);
+        var total = await _uow.Evenements.GetSearchCountAsync(q, categorie, typeEvent, startDate, endDate);
+
+        return Ok(new
         {
-            var query = _context.Evenements
-                .Include(e => e.Localisation)
-                .Include(e => e.BilletTypes)
-                .AsQueryable();
+            data = events,
+            page,
+            pageSize,
+            total,
+            totalPages = (int)Math.Ceiling((double)total / pageSize)
+        });
+    }
 
-            // 1. Recherche par mot-clé (titre ou description)
-            if (!string.IsNullOrWhiteSpace(q))
-            {
-                query = query.Where(e =>
-                    e.Titre.ToLower().Contains(q.ToLower()) ||
-                    (e.Description != null && e.Description.ToLower().Contains(q.ToLower())));
-            }
+    // GET: api/events/categories
+    [HttpGet("categories")]
+    public async Task<ActionResult> GetCategories()
+    {
+        var categories = await _uow.Evenements.GetCategoriesAsync();
+        return Ok(categories);
+    }
 
-            // 2. Filtre par catégorie
-            if (!string.IsNullOrWhiteSpace(categorie))
-            {
-                query = query.Where(e => e.Categorie == categorie);
-            }
+    // GET: api/events/upcoming
+    [HttpGet("upcoming")]
+    public async Task<ActionResult> GetUpcomingEvents()
+    {
+        var events = await _uow.Evenements.GetUpcomingAsync(10);
+        return Ok(events);
+    }
 
-            // 3. Filtre par type d'événement (ONSITE, ONLINE, HYBRID)
-            if (!string.IsNullOrWhiteSpace(typeEvent))
-            {
-                query = query.Where(e => e.TypeEvent == typeEvent);
-            }
+    // GET: api/events/free
+    [HttpGet("free")]
+    public async Task<ActionResult> GetFreeEvents()
+    {
+        var events = await _uow.Evenements.GetFreeAsync();
+        return Ok(events);
+    }
 
-            // 4. Filtre par date de début
-            if (startDate.HasValue)
-            {
-                query = query.Where(e => e.StartDate.Date >= startDate.Value.Date);
-            }
+    // ── Private helpers ──────────────────────────────────────────────
 
-            // 5. Filtre par date de fin
-            if (endDate.HasValue)
-            {
-                query = query.Where(e => e.EndDate.Date <= endDate.Value.Date);
-            }
-
-            // Trier par date (les plus proches d'abord)
-            query = query.OrderBy(e => e.StartDate);
-
-            var events = await query.ToListAsync();
-            return Ok(events);
-        }
-
-        // GET: api/events/categories
-        [HttpGet("categories")]
-        public async Task<ActionResult<IEnumerable<string>>> GetCategories()
-        {
-            var categories = await _context.Evenements
-                .Where(e => !string.IsNullOrEmpty(e.Categorie))
-                .Select(e => e.Categorie)
-                .Distinct()
-                .ToListAsync();
-
-            return Ok(categories);
-        }
-
-        // GET: api/events/upcoming
-        [HttpGet("upcoming")]
-        public async Task<ActionResult<IEnumerable<Evenement>>> GetUpcomingEvents()
-        {
-            var today = DateTime.UtcNow.Date;
-
-            var events = await _context.Evenements
-                .Include(e => e.Localisation)
-                .Include(e => e.BilletTypes)
-                .Where(e => e.StartDate.Date >= today && e.Disponibilite == "Disponible")
-                .OrderBy(e => e.StartDate)
-                .Take(10)
-                .ToListAsync();
-
-            return Ok(events);
-        }
-
-        // GET: api/events/free
-        [HttpGet("free")]
-        public async Task<ActionResult<IEnumerable<Evenement>>> GetFreeEvents()
-        {
-            var events = await _context.Evenements
-                .Include(e => e.BilletTypes)
-                .Where(e => e.BilletTypes.Any(bt => bt.Prix == 0) && e.Disponibilite == "Disponible")
-                .OrderBy(e => e.StartDate)
-                .ToListAsync();
-
-            return Ok(events);
-        }
-
-        private string GenerateLienPartage()
-        {
-            return Guid.NewGuid().ToString().Substring(0, 8);
-        }
+    private static string GenerateLienPartage()
+    {
+        return Guid.NewGuid().ToString("N")[..8];
     }
 }

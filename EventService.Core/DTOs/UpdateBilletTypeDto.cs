@@ -2,7 +2,7 @@
 
 namespace EventService.Core.DTOs;
 
-public class CreateBilletTypeDto
+public class UpdateBilletTypeDto
 {
     [Required]
     public int OrganisateurId { get; set; }
