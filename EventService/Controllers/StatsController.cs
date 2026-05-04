@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using EventService.Core.Interfaces;
 using EventService.Core.DTOs;
+using EventService.Core.Helpers;
 
 namespace EventService.Controllers;
 
@@ -15,10 +17,15 @@ public class StatsController : ControllerBase
         _uow = uow;
     }
 
-    // GET: api/organizer/{id}/stats
+    [Authorize]
     [HttpGet("organizer/{organisateurId}/stats")]
     public async Task<ActionResult> GetOrganizerStats(int organisateurId)
     {
+        // ✅ Verify caller is requesting their own stats
+        var userId = ClaimsHelper.GetUserId(User);
+        if (userId != organisateurId && !ClaimsHelper.IsAdmin(User))
+            return StatusCode(403, new { message = "You can only view your own stats" });
+
         var evenements = await _uow.Evenements.GetByOrganisateurAsync(organisateurId);
         var evenementList = evenements.ToList();
 
@@ -63,16 +70,17 @@ public class StatsController : ControllerBase
         return Ok(stats);
     }
 
-    // GET: api/events/{id}/stats
+    [Authorize]
     [HttpGet("events/{id}/stats")]
-    public async Task<ActionResult> GetEventStats(int id, [FromQuery] int organisateurId)
+    public async Task<ActionResult> GetEventStats(int id)
     {
         var evenement = await _uow.Evenements.GetByIdAsync(id);
-
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
 
-        if (evenement.OrganisateurId != organisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (evenement.OrganisateurId != userId && !ClaimsHelper.IsAdmin(User))
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
         var billetsVendus = evenement.BilletTypes
@@ -112,16 +120,17 @@ public class StatsController : ControllerBase
         });
     }
 
-    // GET: api/events/{id}/participants
+    [Authorize]
     [HttpGet("events/{id}/participants")]
-    public async Task<ActionResult> GetParticipants(int id, [FromQuery] int organisateurId)
+    public async Task<ActionResult> GetParticipants(int id)
     {
         var evenement = await _uow.Evenements.GetByIdAsync(id);
-
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
 
-        if (evenement.OrganisateurId != organisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (evenement.OrganisateurId != userId && !ClaimsHelper.IsAdmin(User))
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
         var participants = evenement.BilletTypes

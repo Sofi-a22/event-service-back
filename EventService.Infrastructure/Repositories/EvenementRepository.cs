@@ -17,7 +17,7 @@ public class EvenementRepository : IEvenementRepository
     public async Task<IEnumerable<Evenement>> GetAllAsync(int page, int pageSize)
     {
         return await _context.Evenements
-            .Where(e => !e.IsDeleted)
+            .Where(e => e.DeletedAt == null)
             .Include(e => e.Localisation)
             .Include(e => e.BilletTypes)
             .OrderBy(e => e.StartDate)
@@ -29,13 +29,13 @@ public class EvenementRepository : IEvenementRepository
     public async Task<int> GetTotalCountAsync()
     {
         return await _context.Evenements
-            .CountAsync(e => !e.IsDeleted);
+            .CountAsync(e => e.DeletedAt == null);
     }
 
     public async Task<Evenement?> GetByIdAsync(int id)
     {
         return await _context.Evenements
-            .Where(e => !e.IsDeleted)
+            .Where(e => e.DeletedAt == null)
             .Include(e => e.Localisation)
             .Include(e => e.BilletTypes)
                 .ThenInclude(bt => bt.Billets)
@@ -45,9 +45,10 @@ public class EvenementRepository : IEvenementRepository
     public async Task<IEnumerable<Evenement>> GetByOrganisateurAsync(int organisateurId)
     {
         return await _context.Evenements
-            .Where(e => e.OrganisateurId == organisateurId && !e.IsDeleted)
+            .Where(e => e.OrganisateurId == organisateurId && e.DeletedAt == null)
             .Include(e => e.Localisation)
             .Include(e => e.BilletTypes)
+                .ThenInclude(bt => bt.Billets)
             .OrderBy(e => e.StartDate)
             .ToListAsync();
     }
@@ -78,8 +79,8 @@ public class EvenementRepository : IEvenementRepository
         var today = DateTime.UtcNow.Date;
 
         return await _context.Evenements
-            .Where(e => !e.IsDeleted
-                     && e.StartDate.Date >= today
+            .Where(e => e.DeletedAt == null
+                     && e.StartDate >= today
                      && e.Disponibilite == "Disponible")
             .Include(e => e.Localisation)
             .Include(e => e.BilletTypes)
@@ -91,7 +92,7 @@ public class EvenementRepository : IEvenementRepository
     public async Task<IEnumerable<Evenement>> GetFreeAsync()
     {
         return await _context.Evenements
-            .Where(e => !e.IsDeleted
+            .Where(e => e.DeletedAt == null
                      && e.Disponibilite == "Disponible"
                      && e.BilletTypes.Any(bt => bt.Prix == 0))
             .Include(e => e.BilletTypes)
@@ -102,7 +103,7 @@ public class EvenementRepository : IEvenementRepository
     public async Task<IEnumerable<string>> GetCategoriesAsync()
     {
         return await _context.Evenements
-            .Where(e => !e.IsDeleted && !string.IsNullOrEmpty(e.Categorie))
+            .Where(e => e.DeletedAt == null && !string.IsNullOrEmpty(e.Categorie))
             .Select(e => e.Categorie)
             .Distinct()
             .ToListAsync();
@@ -120,7 +121,7 @@ public class EvenementRepository : IEvenementRepository
 
     public void SoftDelete(Evenement evenement)
     {
-        evenement.IsDeleted = true;
+        evenement.DeletedAt = DateTime.UtcNow;
         evenement.UpdatedAt = DateTime.UtcNow;
         _context.Evenements.Update(evenement);
     }
@@ -132,7 +133,7 @@ public class EvenementRepository : IEvenementRepository
         DateTime? startDate, DateTime? endDate)
     {
         var query = _context.Evenements
-            .Where(e => !e.IsDeleted)
+            .Where(e => e.DeletedAt == null)
             .Include(e => e.Localisation)
             .Include(e => e.BilletTypes)
             .AsQueryable();
@@ -149,10 +150,10 @@ public class EvenementRepository : IEvenementRepository
             query = query.Where(e => e.TypeEvent == typeEvent);
 
         if (startDate.HasValue)
-            query = query.Where(e => e.StartDate.Date >= startDate.Value.Date);
+            query = query.Where(e => e.StartDate >= startDate.Value);
 
         if (endDate.HasValue)
-            query = query.Where(e => e.EndDate.Date <= endDate.Value.Date);
+            query = query.Where(e => e.EndDate <= endDate.Value);
 
         return query.OrderBy(e => e.StartDate);
     }

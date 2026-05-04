@@ -12,8 +12,8 @@ using Oracle.EntityFrameworkCore.Metadata;
 namespace EventService.Infrastructure.Migrations
 {
     [DbContext(typeof(EventDbContext))]
-    [Migration("20260427001128_AddIsDeletedToEvenement")]
-    partial class AddIsDeletedToEvenement
+    [Migration("20260504222112_AddDeletedAt")]
+    partial class AddDeletedAt
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -52,7 +52,6 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("DATE_VALIDATION");
 
                     b.Property<string>("PaymentTransactionId")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("NVARCHAR2(100)")
                         .HasColumnName("PAYMENT_TRANSACTION_ID");
@@ -132,7 +131,6 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("CAPACITE");
 
                     b.Property<string>("Categorie")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("NVARCHAR2(50)")
                         .HasColumnName("CATEGORIE");
@@ -141,13 +139,15 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnType("TIMESTAMP(7)")
                         .HasColumnName("CREATED_AT");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TIMESTAMP(7)")
+                        .HasColumnName("DELETED_AT");
+
                     b.Property<string>("Description")
-                        .IsRequired()
                         .HasColumnType("NVARCHAR2(2000)")
                         .HasColumnName("DESCRIPTION");
 
                     b.Property<string>("Disponibilite")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("NVARCHAR2(50)")
                         .HasColumnName("DISPONIBILITE");
@@ -156,14 +156,7 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnType("TIMESTAMP(7)")
                         .HasColumnName("END_DATE");
 
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("NUMBER(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("IS_DELETED");
-
                     b.Property<string>("LienPartage")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("NVARCHAR2(255)")
                         .HasColumnName("LIEN_PARTAGE");
@@ -191,7 +184,6 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("TITRE");
 
                     b.Property<string>("TypeEvent")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("NVARCHAR2(50)")
                         .HasColumnName("TYPE_EVENT");

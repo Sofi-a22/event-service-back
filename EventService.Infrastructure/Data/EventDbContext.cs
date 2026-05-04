@@ -34,7 +34,8 @@ public class EventDbContext : DbContext
                   .HasColumnName("TITRE");
 
             entity.Property(e => e.Description)
-                  .HasColumnName("DESCRIPTION");
+                  .HasColumnName("DESCRIPTION")
+                  .IsRequired(false);
 
             entity.Property(e => e.StartDate)
                   .IsRequired()
@@ -46,15 +47,18 @@ public class EventDbContext : DbContext
 
             entity.Property(e => e.TypeEvent)
                   .HasMaxLength(50)
-                  .HasColumnName("TYPE_EVENT");
+                  .HasColumnName("TYPE_EVENT")
+                  .IsRequired(false);
 
             entity.Property(e => e.Categorie)
                   .HasMaxLength(50)
-                  .HasColumnName("CATEGORIE");
+                  .HasColumnName("CATEGORIE")
+                  .IsRequired(false);
 
             entity.Property(e => e.Disponibilite)
                   .HasMaxLength(50)
-                  .HasColumnName("DISPONIBILITE");
+                  .HasColumnName("DISPONIBILITE")
+                  .IsRequired(false);
 
             entity.Property(e => e.Capacite)
                   .IsRequired()
@@ -66,7 +70,8 @@ public class EventDbContext : DbContext
 
             entity.Property(e => e.LienPartage)
                   .HasMaxLength(255)
-                  .HasColumnName("LIEN_PARTAGE");
+                  .HasColumnName("LIEN_PARTAGE")
+                  .IsRequired(false);
 
             entity.Property(e => e.OrganisateurId)
                   .IsRequired()
@@ -80,10 +85,9 @@ public class EventDbContext : DbContext
 
             entity.Property(e => e.UpdatedAt)
                   .HasColumnName("UPDATED_AT");
-            entity.Property(e => e.IsDeleted)
-      .HasColumnName("IS_DELETED")
-      .HasColumnType("NUMBER(1)")
-      .HasConversion<int>();
+            entity.Property(e => e.DeletedAt)
+      .HasColumnName("DELETED_AT");
+
             // Relations
             entity.HasMany(e => e.BilletTypes)
                   .WithOne(bt => bt.Evenement)

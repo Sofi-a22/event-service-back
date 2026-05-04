@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using EventService.Core.Models;
 using EventService.Core.DTOs;
 using EventService.Core.Interfaces;
+using EventService.Core.Helpers;
 
 namespace EventService.Controllers;
 
@@ -18,7 +20,9 @@ public class EventsController : ControllerBase
         _purchaseService = purchaseService;
     }
 
-    // GET: api/events?page=1&pageSize=10
+    // ── Public endpoints (no login required) ────────────────────────
+
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult> GetEvents(
         [FromQuery] int page = 1,
@@ -40,19 +44,17 @@ public class EventsController : ControllerBase
         });
     }
 
-    // GET: api/events/5
+    [AllowAnonymous]
     [HttpGet("{id}")]
     public async Task<ActionResult> GetEvent(int id)
     {
         var evenement = await _uow.Evenements.GetByIdAsync(id);
-
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
-
         return Ok(evenement);
     }
 
-    // GET: api/events/organizer/{organisateurId}
+    [AllowAnonymous]
     [HttpGet("organizer/{organisateurId}")]
     public async Task<ActionResult> GetEventsByOrganizer(int organisateurId)
     {
@@ -60,10 +62,69 @@ public class EventsController : ControllerBase
         return Ok(events);
     }
 
-    // POST: api/events
+    [AllowAnonymous]
+    [HttpGet("search")]
+    public async Task<ActionResult> SearchEvents(
+        [FromQuery] string? q,
+        [FromQuery] string? categorie,
+        [FromQuery] string? typeEvent,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var events = await _uow.Evenements.SearchAsync(
+            q, categorie, typeEvent, startDate, endDate, page, pageSize);
+        var total = await _uow.Evenements.GetSearchCountAsync(
+            q, categorie, typeEvent, startDate, endDate);
+
+        return Ok(new
+        {
+            data = events,
+            page,
+            pageSize,
+            total,
+            totalPages = (int)Math.Ceiling((double)total / pageSize)
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("categories")]
+    public async Task<ActionResult> GetCategories()
+    {
+        var categories = await _uow.Evenements.GetCategoriesAsync();
+        return Ok(categories);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("upcoming")]
+    public async Task<ActionResult> GetUpcomingEvents()
+    {
+        var events = await _uow.Evenements.GetUpcomingAsync(10);
+        return Ok(events);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("free")]
+    public async Task<ActionResult> GetFreeEvents()
+    {
+        var events = await _uow.Evenements.GetFreeAsync();
+        return Ok(events);
+    }
+
+    // ── Organizer-only endpoints ─────────────────────────────────────
+
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult> CreateEvent(CreateEventDto createDto)
     {
+        // ✅ Role check from JWT
+        if (!ClaimsHelper.IsOrganisateur(User))
+            return StatusCode(403, new { message = "Only organisateurs can create events" });
+
+        // ✅ Get organisateur ID from JWT
+        var organisateurId = ClaimsHelper.GetUserId(User);
+
         var evenement = new Evenement
         {
             Titre = createDto.Titre,
@@ -76,10 +137,10 @@ public class EventsController : ControllerBase
             Capacite = createDto.Capacite,
             PlacesRestantes = createDto.Capacite,
             LienPartage = createDto.LienPartage ?? GenerateLienPartage(),
-            OrganisateurId = createDto.OrganisateurId,
+            OrganisateurId = organisateurId,
             LocalisationId = createDto.LocalisationId,
             CreatedAt = DateTime.UtcNow,
-            IsDeleted = false
+            DeletedAt = null
         };
 
         await _uow.Evenements.AddAsync(evenement);
@@ -88,7 +149,7 @@ public class EventsController : ControllerBase
         return CreatedAtAction(nameof(GetEvent), new { id = evenement.Id }, evenement);
     }
 
-    // PUT: api/events/5
+    [Authorize]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateEvent(int id, UpdateEventDto updateDto)
     {
@@ -96,15 +157,14 @@ public class EventsController : ControllerBase
             return BadRequest(new { message = "ID mismatch" });
 
         var existingEvent = await _uow.Evenements.GetByIdAsync(id);
-
         if (existingEvent == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
 
-        // ✅ Owner check
-        if (existingEvent.OrganisateurId != updateDto.OrganisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (existingEvent.OrganisateurId != userId)
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
-        // ✅ Guard: new capacity cannot be less than tickets already sold
         var soldCount = existingEvent.Capacite - existingEvent.PlacesRestantes;
         if (updateDto.Capacite < soldCount)
             return BadRequest(new
@@ -130,20 +190,19 @@ public class EventsController : ControllerBase
         return NoContent();
     }
 
-    // DELETE: api/events/5 (soft delete)
+    [Authorize]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteEvent(int id, [FromQuery] int organisateurId)
+    public async Task<IActionResult> DeleteEvent(int id)
     {
         var evenement = await _uow.Evenements.GetByIdAsync(id);
-
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
 
-        // ✅ Owner check
-        if (evenement.OrganisateurId != organisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (evenement.OrganisateurId != userId)
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
-        // ✅ Guard: cannot delete if sold/reserved tickets exist
         var hasSoldTickets = evenement.BilletTypes
             .SelectMany(bt => bt.Billets)
             .Any(b => b.Statut == "Confirme" || b.Statut == "Reserve");
@@ -157,64 +216,25 @@ public class EventsController : ControllerBase
         return NoContent();
     }
 
-    // POST: api/events/{id}/purchase
+    // ── User-only endpoints ──────────────────────────────────────────
+
+    [Authorize]
     [HttpPost("{id}/purchase")]
     public async Task<IActionResult> PurchaseTickets(int id, [FromBody] PurchaseRequestDto request)
     {
+        // ✅ Block organisateurs from buying tickets
+        if (ClaimsHelper.IsOrganisateur(User))
+            return StatusCode(403, new { message = "Organisateurs cannot purchase tickets" });
+
+        // ✅ Get visiteur ID from JWT
+        request.VisiteurId = ClaimsHelper.GetUserId(User);
+
         var (success, error, response) = await _purchaseService.PurchaseTicketsAsync(id, request);
 
         if (!success)
             return BadRequest(new { message = error });
 
         return Ok(response);
-    }
-
-    // GET: api/events/search
-    [HttpGet("search")]
-    public async Task<ActionResult> SearchEvents(
-        [FromQuery] string? q,
-        [FromQuery] string? categorie,
-        [FromQuery] string? typeEvent,
-        [FromQuery] DateTime? startDate,
-        [FromQuery] DateTime? endDate,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
-    {
-        var events = await _uow.Evenements.SearchAsync(q, categorie, typeEvent, startDate, endDate, page, pageSize);
-        var total = await _uow.Evenements.GetSearchCountAsync(q, categorie, typeEvent, startDate, endDate);
-
-        return Ok(new
-        {
-            data = events,
-            page,
-            pageSize,
-            total,
-            totalPages = (int)Math.Ceiling((double)total / pageSize)
-        });
-    }
-
-    // GET: api/events/categories
-    [HttpGet("categories")]
-    public async Task<ActionResult> GetCategories()
-    {
-        var categories = await _uow.Evenements.GetCategoriesAsync();
-        return Ok(categories);
-    }
-
-    // GET: api/events/upcoming
-    [HttpGet("upcoming")]
-    public async Task<ActionResult> GetUpcomingEvents()
-    {
-        var events = await _uow.Evenements.GetUpcomingAsync(10);
-        return Ok(events);
-    }
-
-    // GET: api/events/free
-    [HttpGet("free")]
-    public async Task<ActionResult> GetFreeEvents()
-    {
-        var events = await _uow.Evenements.GetFreeAsync();
-        return Ok(events);
     }
 
     // ── Private helpers ──────────────────────────────────────────────

@@ -128,7 +128,6 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("CAPACITE");
 
                     b.Property<string>("Categorie")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("NVARCHAR2(50)")
                         .HasColumnName("CATEGORIE");
@@ -137,13 +136,15 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnType("TIMESTAMP(7)")
                         .HasColumnName("CREATED_AT");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TIMESTAMP(7)")
+                        .HasColumnName("DELETED_AT");
+
                     b.Property<string>("Description")
-                        .IsRequired()
                         .HasColumnType("NVARCHAR2(2000)")
                         .HasColumnName("DESCRIPTION");
 
                     b.Property<string>("Disponibilite")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("NVARCHAR2(50)")
                         .HasColumnName("DISPONIBILITE");
@@ -152,12 +153,7 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnType("TIMESTAMP(7)")
                         .HasColumnName("END_DATE");
 
-                    b.Property<int>("IsDeleted")
-                        .HasColumnType("NUMBER(1)")
-                        .HasColumnName("IS_DELETED");
-
                     b.Property<string>("LienPartage")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("NVARCHAR2(255)")
                         .HasColumnName("LIEN_PARTAGE");
@@ -185,7 +181,6 @@ namespace EventService.Infrastructure.Migrations
                         .HasColumnName("TITRE");
 
                     b.Property<string>("TypeEvent")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("NVARCHAR2(50)")
                         .HasColumnName("TYPE_EVENT");

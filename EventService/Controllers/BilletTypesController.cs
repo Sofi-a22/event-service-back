@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using EventService.Core.Models;
 using EventService.Core.DTOs;
 using EventService.Core.Interfaces;
+using EventService.Core.Helpers;
 
 namespace EventService.Controllers;
 
@@ -18,12 +20,11 @@ public class BilletTypesController : ControllerBase
         _codeGenerator = codeGenerator;
     }
 
-    // GET: api/billettypes/event/{eventId}
+    [AllowAnonymous]
     [HttpGet("event/{eventId}")]
     public async Task<ActionResult> GetBilletTypesByEvent(int eventId)
     {
         var evenement = await _uow.Evenements.GetByIdAsync(eventId);
-
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {eventId} not found" });
 
@@ -42,26 +43,26 @@ public class BilletTypesController : ControllerBase
         return Ok(result);
     }
 
-    // POST: api/billettypes/event/{eventId}
+    [Authorize]
     [HttpPost("event/{eventId}")]
     public async Task<ActionResult> CreateBilletType(int eventId, [FromBody] CreateBilletTypeDto createDto)
     {
-        // 1. Check event exists
-        var evenement = await _uow.Evenements.GetByIdAsync(eventId);
+        if (!ClaimsHelper.IsOrganisateur(User))
+            return StatusCode(403, new { message = "Only organisateurs can create ticket types" });
 
+        var evenement = await _uow.Evenements.GetByIdAsync(eventId);
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {eventId} not found" });
 
-        // 2. Owner check
-        if (evenement.OrganisateurId != createDto.OrganisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (evenement.OrganisateurId != userId)
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
-        // 3. No duplicate type name for same event
         var exists = await _uow.BilletTypes.ExistsAsync(eventId, createDto.Nom);
         if (exists)
             return Conflict(new { message = $"Ticket type '{createDto.Nom}' already exists for this event" });
 
-        // 4. Create ticket type
         var billetType = new BilletType
         {
             Nom = createDto.Nom,
@@ -72,7 +73,6 @@ public class BilletTypesController : ControllerBase
             Billets = new List<Billet>()
         };
 
-        // 5. Generate individual tickets with unique codes
         for (int i = 0; i < createDto.Quantite; i++)
         {
             billetType.Billets.Add(new Billet
@@ -97,27 +97,25 @@ public class BilletTypesController : ControllerBase
         });
     }
 
-    // PUT: api/billettypes/{id}
+    [Authorize]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateBilletType(int id, [FromBody] UpdateBilletTypeDto updateDto)
     {
         var billetType = await _uow.BilletTypes.GetByIdAsync(id);
-
         if (billetType == null)
             return NotFound(new { message = $"Ticket type with ID {id} not found" });
 
-        // Owner check
-        if (billetType.Evenement.OrganisateurId != updateDto.OrganisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (billetType.Evenement.OrganisateurId != userId)
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
-        // Guard: new quantity cannot be less than already sold
         if (updateDto.Quantite < billetType.Vendu)
             return BadRequest(new
             {
                 message = $"New quantity ({updateDto.Quantite}) cannot be less than tickets already sold ({billetType.Vendu})"
             });
 
-        // Sync Billet rows with quantity change
         var diff = updateDto.Quantite - billetType.Quantite;
 
         if (diff > 0)
@@ -140,10 +138,7 @@ public class BilletTypesController : ControllerBase
                 .ToList();
 
             if (toRemove.Count < Math.Abs(diff))
-                return BadRequest(new
-                {
-                    message = "Cannot reduce quantity: not enough available tickets to remove"
-                });
+                return BadRequest(new { message = "Cannot reduce quantity: not enough available tickets to remove" });
 
             _uow.Billets.DeleteRange(toRemove);
         }
@@ -166,20 +161,19 @@ public class BilletTypesController : ControllerBase
         });
     }
 
-    // DELETE: api/billettypes/{id}
+    [Authorize]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteBilletType(int id, [FromQuery] int organisateurId)
+    public async Task<IActionResult> DeleteBilletType(int id)
     {
         var billetType = await _uow.BilletTypes.GetByIdAsync(id);
-
         if (billetType == null)
             return NotFound(new { message = $"Ticket type with ID {id} not found" });
 
-        // Owner check
-        if (billetType.Evenement.OrganisateurId != organisateurId)
+        // ✅ Owner check from JWT
+        var userId = ClaimsHelper.GetUserId(User);
+        if (billetType.Evenement.OrganisateurId != userId)
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
-        // Guard: cannot delete if any ticket is sold or reserved
         if (billetType.Billets.Any(b => b.Statut != "Disponible"))
             return BadRequest(new { message = "Cannot delete ticket type with tickets already sold or reserved" });
 
