@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EventService.Core.Models;
 
@@ -16,6 +17,9 @@ public class Evenement
     public int Capacite { get; set; }
     public int PlacesRestantes { get; set; }
     public string? LienPartage { get; set; }
+
+    [Column("IMAGE_URL")]
+    public string? ImageUrl { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? DeletedAt { get; set; }

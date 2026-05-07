@@ -48,6 +48,27 @@ public class BilletRepository : IBilletRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<Billet>> GetReservedByUserAndEventAsync(int userId, int eventId)
+    {
+        return await _context.Billets
+            .Include(b => b.BilletType)
+            .Where(b => b.VisiteurId == userId
+                     && b.BilletType.EvenementId == eventId
+                     && b.Statut == "Reserve")
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<Billet>> GetByEventAsync(int eventId)
+    {
+        return await _context.Billets
+            .Include(b => b.BilletType)
+                .ThenInclude(bt => bt.Evenement)
+            .Where(b => b.BilletType.EvenementId == eventId
+                     && b.Statut != "Disponible")
+            .OrderByDescending(b => b.DateReservation)
+            .ToListAsync();
+    }
+
     public void Update(Billet billet)
     {
         _context.Billets.Update(billet);

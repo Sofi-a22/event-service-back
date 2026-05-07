@@ -68,7 +68,18 @@ public class PurchaseService : IPurchaseService
             _uow.Billets.Update(billet);
         }
 
-        // 5. ONE save for everything
+        // 5. Update Vendu counter on each BilletType and PlacesRestantes on Evenement
+        foreach (var item in request.Items)
+        {
+            var billetType = evenement.BilletTypes.First(bt => bt.Id == item.BilletTypeId);
+            billetType.Vendu = billetType.Vendu + item.Quantite;
+            _uow.BilletTypes.Update(billetType);
+        }
+
+        evenement.PlacesRestantes = Math.Max(0, evenement.PlacesRestantes - totalDemande);
+        _uow.Evenements.Update(evenement);
+
+        // 6. ONE save for everything
         await _uow.SaveChangesAsync();
 
         // 6. Build response

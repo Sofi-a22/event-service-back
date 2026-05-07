@@ -137,6 +137,7 @@ public class EventsController : ControllerBase
             Capacite = createDto.Capacite,
             PlacesRestantes = createDto.Capacite,
             LienPartage = createDto.LienPartage ?? GenerateLienPartage(),
+            ImageUrl = createDto.ImageUrl,
             OrganisateurId = organisateurId,
             LocalisationId = createDto.LocalisationId,
             CreatedAt = DateTime.UtcNow,
@@ -182,6 +183,7 @@ public class EventsController : ControllerBase
         existingEvent.Capacite = updateDto.Capacite;
         existingEvent.PlacesRestantes = updateDto.Capacite - soldCount;
         existingEvent.LocalisationId = updateDto.LocalisationId;
+        existingEvent.ImageUrl = updateDto.ImageUrl ?? existingEvent.ImageUrl;
         existingEvent.UpdatedAt = DateTime.UtcNow;
 
         _uow.Evenements.Update(existingEvent);

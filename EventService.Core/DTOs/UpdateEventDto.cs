@@ -13,4 +13,5 @@ public class UpdateEventDto
     public int Capacite { get; set; }
     public int OrganisateurId { get; set; }
     public int? LocalisationId { get; set; }
+    public string? ImageUrl { get; set; }
 }

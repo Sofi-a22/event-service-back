@@ -72,6 +72,7 @@ builder.Services.AddDbContext<EventDbContext>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false; // Keep original claim names (role, id, sub)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = false,  // User Service doesn't set issuer

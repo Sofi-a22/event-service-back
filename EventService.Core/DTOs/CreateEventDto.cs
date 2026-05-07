@@ -11,6 +11,7 @@ public class CreateEventDto
     public string? Disponibilite { get; set; }
     public int Capacite { get; set; }
     public string? LienPartage { get; set; }
+    public string? ImageUrl { get; set; }
     public int OrganisateurId { get; set; }  // ✅ Seulement l'ID
     public int? LocalisationId { get; set; }
 }

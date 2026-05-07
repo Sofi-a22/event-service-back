@@ -15,7 +15,7 @@ public static class ClaimsHelper
     // User Service puts numeric ID in "userId" claim (after teammate adds it)
     public static int GetUserId(ClaimsPrincipal user)
     {
-        var claim = user.FindFirst("userId")?.Value;
+        var claim = user.FindFirst("id")?.Value;
         return int.TryParse(claim, out var id) ? id : 0;
     }
 
