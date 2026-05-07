@@ -1,4 +1,5 @@
-﻿using EventService.Core.DTOs;
+using EventService.Core.DTOs;
+using EventService.Core.Enums;
 using EventService.Core.Interfaces;
 using EventService.Core.Models;
 
@@ -60,7 +61,7 @@ public class PurchaseService : IPurchaseService
 
         foreach (var (billet, _) in reservations)
         {
-            billet.Statut = "Reserve";
+            billet.Statut = StatutBillet.Reserve;
             billet.DateReservation = now;
             billet.VisiteurId = request.VisiteurId;
             billet.PaymentTransactionId = transactionId;
@@ -82,7 +83,7 @@ public class PurchaseService : IPurchaseService
         // 6. ONE save for everything
         await _uow.SaveChangesAsync();
 
-        // 6. Build response
+        // 7. Build response
         var montantTotal = reservations.Sum(r => r.Type.Prix);
 
         var response = new PurchaseResponseDto
@@ -98,7 +99,7 @@ public class PurchaseService : IPurchaseService
                 Code = r.Billet.Code,
                 BilletTypeNom = r.Type.Nom,
                 Prix = r.Type.Prix,
-                Statut = r.Billet.Statut
+                Statut = r.Billet.Statut.ToString()
             }).ToList()
         };
 

@@ -1,19 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using EventService.Core.Enums;
 
 namespace EventService.Core.Models;
 
 public class Evenement
 {
-    public int Id { get; set; }  
+    public int Id { get; set; }
     public string Titre { get; set; } = string.Empty;
     public string? Description { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public string? TypeEvent { get; set; }
-    public string? Categorie { get; set; }
-    public string? Disponibilite { get; set; }
+    public TypeEvenement? TypeEvent { get; set; }
+    public CategorieEvenement? Categorie { get; set; }
+    public DisponibiliteEvenement? Disponibilite { get; set; }
     public int Capacite { get; set; }
     public int PlacesRestantes { get; set; }
     public string? LienPartage { get; set; }

@@ -1,4 +1,5 @@
-﻿using EventService.Core.Interfaces;
+using EventService.Core.Enums;
+using EventService.Core.Interfaces;
 using EventService.Core.Models;
 using EventService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -43,7 +44,7 @@ public class BilletRepository : IBilletRepository
     public async Task<IEnumerable<Billet>> GetAvailableByTypeAsync(int billetTypeId, int count)
     {
         return await _context.Billets
-            .Where(b => b.BilletTypeId == billetTypeId && b.Statut == "Disponible")
+            .Where(b => b.BilletTypeId == billetTypeId && b.Statut == StatutBillet.Disponible)
             .Take(count)
             .ToListAsync();
     }
@@ -54,7 +55,7 @@ public class BilletRepository : IBilletRepository
             .Include(b => b.BilletType)
             .Where(b => b.VisiteurId == userId
                      && b.BilletType.EvenementId == eventId
-                     && b.Statut == "Reserve")
+                     && b.Statut == StatutBillet.Reserve)
             .ToListAsync();
     }
 
@@ -64,7 +65,7 @@ public class BilletRepository : IBilletRepository
             .Include(b => b.BilletType)
                 .ThenInclude(bt => bt.Evenement)
             .Where(b => b.BilletType.EvenementId == eventId
-                     && b.Statut != "Disponible")
+                     && b.Statut != StatutBillet.Disponible)
             .OrderByDescending(b => b.DateReservation)
             .ToListAsync();
     }

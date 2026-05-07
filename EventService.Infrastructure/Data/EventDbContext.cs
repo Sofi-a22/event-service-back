@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using EventService.Core.Models;
+using EventService.Core.Enums;
 
 namespace EventService.Infrastructure.Data;
 
@@ -48,17 +49,20 @@ public class EventDbContext : DbContext
             entity.Property(e => e.TypeEvent)
                   .HasMaxLength(50)
                   .HasColumnName("TYPE_EVENT")
-                  .IsRequired(false);
+                  .IsRequired(false)
+                  .HasConversion<string>();
 
             entity.Property(e => e.Categorie)
                   .HasMaxLength(50)
                   .HasColumnName("CATEGORIE")
-                  .IsRequired(false);
+                  .IsRequired(false)
+                  .HasConversion<string>();
 
             entity.Property(e => e.Disponibilite)
                   .HasMaxLength(50)
                   .HasColumnName("DISPONIBILITE")
-                  .IsRequired(false);
+                  .IsRequired(false)
+                  .HasConversion<string>();
 
             entity.Property(e => e.Capacite)
                   .IsRequired()
@@ -158,8 +162,9 @@ public class EventDbContext : DbContext
             entity.Property(b => b.Statut)
                   .IsRequired()
                   .HasMaxLength(20)
-                  .HasDefaultValue("Disponible")
-                  .HasColumnName("STATUT");
+                  .HasDefaultValue(StatutBillet.Disponible)
+                  .HasColumnName("STATUT")
+                  .HasConversion<string>();
 
             entity.Property(b => b.DateReservation)
                   .HasColumnName("DATE_RESERVATION");

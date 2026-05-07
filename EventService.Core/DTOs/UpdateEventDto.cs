@@ -1,4 +1,6 @@
-﻿namespace EventService.Core.DTOs;
+using EventService.Core.Enums;
+
+namespace EventService.Core.DTOs;
 
 public class UpdateEventDto
 {
@@ -7,9 +9,9 @@ public class UpdateEventDto
     public string Description { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public string TypeEvent { get; set; } = string.Empty;
-    public string Categorie { get; set; } = string.Empty;
-    public string Disponibilite { get; set; } = string.Empty;
+    public TypeEvenement TypeEvent { get; set; }
+    public CategorieEvenement Categorie { get; set; }
+    public DisponibiliteEvenement Disponibilite { get; set; }
     public int Capacite { get; set; }
     public int OrganisateurId { get; set; }
     public int? LocalisationId { get; set; }

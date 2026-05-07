@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using EventService.Core.Enums;
 using EventService.Core.Interfaces;
 using EventService.Core.DTOs;
 using EventService.Core.Helpers;
@@ -21,7 +22,6 @@ public class StatsController : ControllerBase
     [HttpGet("organizer/{organisateurId}/stats")]
     public async Task<ActionResult> GetOrganizerStats(int organisateurId)
     {
-        // ✅ Verify caller is requesting their own stats
         var userId = ClaimsHelper.GetUserId(User);
         if (userId != organisateurId && !ClaimsHelper.IsAdmin(User))
             return StatusCode(403, new { message = "You can only view your own stats" });
@@ -40,11 +40,11 @@ public class StatsController : ControllerBase
             {
                 var billetsVendus = e.BilletTypes
                     .SelectMany(bt => bt.Billets)
-                    .Count(b => b.Statut == "Confirme");
+                    .Count(b => b.Statut == StatutBillet.Confirme);
 
                 var revenue = e.BilletTypes
                     .SelectMany(bt => bt.Billets
-                        .Where(b => b.Statut == "Confirme")
+                        .Where(b => b.Statut == StatutBillet.Confirme)
                         .Select(b => bt.Prix))
                     .Sum();
 
@@ -78,18 +78,17 @@ public class StatsController : ControllerBase
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
 
-        // ✅ Owner check from JWT
         var userId = ClaimsHelper.GetUserId(User);
         if (evenement.OrganisateurId != userId && !ClaimsHelper.IsAdmin(User))
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
         var billetsVendus = evenement.BilletTypes
             .SelectMany(bt => bt.Billets)
-            .Count(b => b.Statut == "Confirme");
+            .Count(b => b.Statut == StatutBillet.Confirme);
 
         var revenue = evenement.BilletTypes
             .SelectMany(bt => bt.Billets
-                .Where(b => b.Statut == "Confirme")
+                .Where(b => b.Statut == StatutBillet.Confirme)
                 .Select(b => bt.Prix))
             .Sum();
 
@@ -99,10 +98,10 @@ public class StatsController : ControllerBase
             bt.Nom,
             bt.Prix,
             bt.Quantite,
-            Vendus = bt.Billets.Count(b => b.Statut == "Confirme"),
-            Reserves = bt.Billets.Count(b => b.Statut == "Reserve"),
-            Disponibles = bt.Billets.Count(b => b.Statut == "Disponible"),
-            Revenue = bt.Billets.Count(b => b.Statut == "Confirme") * bt.Prix
+            Vendus    = bt.Billets.Count(b => b.Statut == StatutBillet.Confirme),
+            Reserves  = bt.Billets.Count(b => b.Statut == StatutBillet.Reserve),
+            Disponibles = bt.Billets.Count(b => b.Statut == StatutBillet.Disponible),
+            Revenue   = bt.Billets.Count(b => b.Statut == StatutBillet.Confirme) * bt.Prix
         });
 
         return Ok(new
@@ -128,19 +127,18 @@ public class StatsController : ControllerBase
         if (evenement == null)
             return NotFound(new { message = $"Event with ID {id} not found" });
 
-        // ✅ Owner check from JWT
         var userId = ClaimsHelper.GetUserId(User);
         if (evenement.OrganisateurId != userId && !ClaimsHelper.IsAdmin(User))
             return StatusCode(403, new { message = "You are not the owner of this event" });
 
         var participants = evenement.BilletTypes
             .SelectMany(bt => bt.Billets
-                .Where(b => b.Statut == "Confirme" || b.Statut == "Reserve")
+                .Where(b => b.Statut == StatutBillet.Confirme || b.Statut == StatutBillet.Reserve)
                 .Select(b => new
                 {
                     billetId = b.Id,
                     code = b.Code,
-                    statut = b.Statut,
+                    statut = b.Statut.ToString(),
                     visiteurId = b.VisiteurId,
                     billetType = bt.Nom,
                     prix = bt.Prix,

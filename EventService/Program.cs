@@ -14,6 +14,9 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler =
             System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        // Serialize enums as strings (e.g. "Confirme" not 2)
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
 builder.Services.AddEndpointsApiExplorer();

@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using EventService.Core.Enums;
 using EventService.Core.Interfaces;
 using EventService.Core.DTOs;
 
@@ -26,7 +27,7 @@ public class BilletsController : ControllerBase
         {
             Id = b.Id,
             Code = b.Code,
-            Statut = b.Statut,
+            Statut = b.Statut.ToString(),
             DateReservation = b.DateReservation,
             BilletTypeNom = b.BilletType.Nom,
             Prix = b.BilletType.Prix,
@@ -34,7 +35,7 @@ public class BilletsController : ControllerBase
             EvenementTitre = b.BilletType.Evenement.Titre,
             EvenementStartDate = b.BilletType.Evenement.StartDate,
             EvenementEndDate = b.BilletType.Evenement.EndDate,
-            EvenementType = b.BilletType.Evenement.TypeEvent
+            EvenementType = b.BilletType.Evenement.TypeEvent?.ToString() ?? string.Empty
         });
 
         return Ok(result);
@@ -53,7 +54,7 @@ public class BilletsController : ControllerBase
         {
             Id = billet.Id,
             Code = billet.Code,
-            Statut = billet.Statut,
+            Statut = billet.Statut.ToString(),
             DateReservation = billet.DateReservation,
             BilletTypeNom = billet.BilletType.Nom,
             Prix = billet.BilletType.Prix,
@@ -61,14 +62,13 @@ public class BilletsController : ControllerBase
             EvenementTitre = billet.BilletType.Evenement.Titre,
             EvenementStartDate = billet.BilletType.Evenement.StartDate,
             EvenementEndDate = billet.BilletType.Evenement.EndDate,
-            EvenementType = billet.BilletType.Evenement.TypeEvent
+            EvenementType = billet.BilletType.Evenement.TypeEvent?.ToString() ?? string.Empty
         };
 
         return Ok(result);
     }
 
     // GET: api/billets/event/{eventId}
-    // Returns all purchased tickets for an event (for organizer participants view)
     [HttpGet("event/{eventId}")]
     [Authorize]
     public async Task<ActionResult> GetBilletsByEvent(int eventId)
@@ -79,7 +79,7 @@ public class BilletsController : ControllerBase
         {
             id = b.Id,
             code = b.Code,
-            statut = b.Statut,
+            statut = b.Statut.ToString(),
             dateReservation = b.DateReservation,
             visiteurId = b.VisiteurId,
             billetTypeNom = b.BilletType.Nom,
@@ -91,7 +91,6 @@ public class BilletsController : ControllerBase
     }
 
     // POST: api/billets/validate
-    // Used by organizer's QR scanner to mark a ticket as used
     [HttpPost("validate")]
     [Authorize]
     public async Task<ActionResult> ValidateTicket([FromBody] ValidateTicketDto dto)
@@ -104,14 +103,12 @@ public class BilletsController : ControllerBase
         if (billet == null)
             return NotFound(new { message = "Ticket not found. Invalid code." });
 
-        // Verify the ticket belongs to the specified event
         if (dto.EventId.HasValue && billet.BilletType.EvenementId != dto.EventId.Value)
             return BadRequest(new { message = "This ticket does not belong to this event." });
 
-        // Check current status
         switch (billet.Statut)
         {
-            case "Utilise":
+            case StatutBillet.Utilise:
                 return Conflict(new
                 {
                     message = "This ticket has already been used.",
@@ -119,16 +116,15 @@ public class BilletsController : ControllerBase
                     ticketType = billet.BilletType.Nom
                 });
 
-            case "Annule":
+            case StatutBillet.Annule:
                 return BadRequest(new { message = "This ticket has been cancelled." });
 
-            case "Disponible":
+            case StatutBillet.Disponible:
                 return BadRequest(new { message = "This ticket was never purchased." });
 
-            case "Reserve":
-            case "Confirme":
-                // ✅ Valid — mark as used
-                billet.Statut = "Utilise";
+            case StatutBillet.Reserve:
+            case StatutBillet.Confirme:
+                billet.Statut = StatutBillet.Utilise;
                 billet.DateValidation = DateTime.UtcNow;
                 _uow.Billets.Update(billet);
                 await _uow.SaveChangesAsync();

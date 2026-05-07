@@ -1,10 +1,12 @@
-﻿namespace EventService.Core.Models;
+﻿using EventService.Core.Enums;
+
+namespace EventService.Core.Models;
 
 public class Billet
 {
     public int Id { get; set; }
     public string Code { get; set; } = string.Empty;
-    public string Statut { get; set; } = "Disponible";
+    public StatutBillet Statut { get; set; } = StatutBillet.Disponible;
 
     public DateTime? DateReservation { get; set; }
     public DateTime? DateValidation { get; set; }

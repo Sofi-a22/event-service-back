@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using EventService.Core.Enums;
 using EventService.Core.Models;
 using EventService.Core.DTOs;
 using EventService.Core.Interfaces;
@@ -133,7 +134,7 @@ public class EventsController : ControllerBase
             EndDate = createDto.EndDate,
             TypeEvent = createDto.TypeEvent,
             Categorie = createDto.Categorie,
-            Disponibilite = createDto.Disponibilite ?? "Draft",
+            Disponibilite = createDto.Disponibilite ?? DisponibiliteEvenement.Draft,
             Capacite = createDto.Capacite,
             PlacesRestantes = createDto.Capacite,
             LienPartage = createDto.LienPartage ?? GenerateLienPartage(),
@@ -207,7 +208,7 @@ public class EventsController : ControllerBase
 
         var hasSoldTickets = evenement.BilletTypes
             .SelectMany(bt => bt.Billets)
-            .Any(b => b.Statut == "Confirme" || b.Statut == "Reserve");
+            .Any(b => b.Statut == StatutBillet.Confirme || b.Statut == StatutBillet.Reserve);
 
         if (hasSoldTickets)
             return BadRequest(new { message = "Cannot delete event with sold or reserved tickets" });
